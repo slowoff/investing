@@ -771,7 +771,7 @@ let state = {
 async function save() {
   try { await window.storage.set('portfolio-state', JSON.stringify(state)); } catch(e) {}
 }
-const DATA_VERSION = 3; // bump this every time trades/dividends are updated
+const DATA_VERSION = 4; // bump this every time trades/dividends are updated
 
 async function load() {
   try {
