@@ -571,17 +571,20 @@
     </div>
   </div>
   <div class="triggers" id="triggersEl"></div>
-  <div class="two-col">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Allocation</span></div>
-      <div class="pie-wrap">
-        <canvas id="pieCanvas" width="200" height="200"></canvas>
-        <div class="pie-legend" id="pieLegend"></div>
-      </div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><span class="card-title">Allocation</span></div>
+    <div class="pie-wrap">
+      <canvas id="pieCanvas" width="200" height="200"></canvas>
+      <div class="pie-legend" id="pieLegend"></div>
     </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Monthly Invested (CHF)</span></div>
-      <div id="barChart" style="padding:24px 20px;display:flex;align-items:flex-end;gap:16px;height:240px;box-sizing:border-box"></div>
+  </div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <span class="card-title">Market News</span>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted)" id="newsAge"></span>
+    </div>
+    <div id="newsList" style="padding:8px 0">
+      <div style="padding:16px 20px;font-size:12px;color:var(--muted);font-family:var(--mono)">Loading news...</div>
     </div>
   </div>
 </div>
@@ -1287,7 +1290,27 @@ async function maybeAutoFetch() {
   if (age > 5) fetchPrices();
 }
 
-load().then(() => fetchPrices());
+async function fetchNews() {
+  try {
+    const r = await fetch('https://yf-proxy.rafael-ferreira-oliveira06.workers.dev/?news=1');
+    const items = await r.json();
+    const list = document.getElementById('newsList');
+    const age  = document.getElementById('newsAge');
+    if (!items.length) { list.innerHTML = '<div style="padding:16px 20px;font-size:12px;color:var(--muted);font-family:var(--mono)">No news found</div>'; return; }
+    age.textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    list.innerHTML = items.map(n => {
+      const when = n.pubDate ? new Date(n.pubDate).toLocaleString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+      return `<a href="${n.link||'#'}" target="_blank" style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:10px 20px;border-bottom:1px solid var(--border);text-decoration:none;transition:background .1s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+        <span style="font-size:13px;color:var(--white);line-height:1.4;flex:1">${n.title}</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);white-space:nowrap;margin-top:3px">${when}</span>
+      </a>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('newsList').innerHTML = '<div style="padding:16px 20px;font-size:12px;color:var(--red);font-family:var(--mono)">Failed to load news</div>';
+  }
+}
+
+load().then(() => { fetchPrices(); fetchNews(); });
 </script>
 </body>
 </html>
