@@ -1204,10 +1204,13 @@ document.getElementById('editModal').addEventListener('click', function(e) {
 // Yahoo Finance via corsproxy.io — free, no key needed
 const TICKER_MAP = {
   "MSCI World CHF Hedged": "IWDC.SW",
-  "EQQQ Nasdaq 100":        "EQQQ.DE",   // XETRA, EUR → convert to CHF
+  "EQQQ Nasdaq 100":        "EQQQ.SW",   // SIX Swiss Exchange — Yahoo mislabels as USD, price is actually CHF
   "Swissqoin (SWQ)":        null,
 };
-let gbpChf = 1.13;
+
+// Force CHF for SIX-listed tickers Yahoo mislabels
+const FORCE_CHF = new Set(["EQQQ.SW"]);
+let gbpChf = 0.865;
 let eurChf = 0.96;
 
 async function getFxRates() {
@@ -1253,8 +1256,11 @@ async function fetchPrices(manual = false) {
       if (res.status === 'fulfilled') {
         const { price, currency } = res.value;
         let priceCHF = price;
-        if (currency === 'GBp' || currency === 'GBX') priceCHF = (price / 100) * gbpChf;
-        if (currency === 'EUR') priceCHF = price * eurChf;
+        if (!FORCE_CHF.has(TICKER_MAP[sec])) {
+          if (currency === 'GBp' || currency === 'GBX') priceCHF = (price / 100) * gbpChf;
+          if (currency === 'EUR') priceCHF = price * eurChf;
+          if (currency === 'USD') priceCHF = price * state.usdRate;
+        }
         state.prices[sec] = parseFloat(priceCHF.toFixed(4));
         ok++;
       } else { fail++; }
