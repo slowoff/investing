@@ -1204,18 +1204,22 @@ document.getElementById('editModal').addEventListener('click', function(e) {
 // Yahoo Finance via corsproxy.io — free, no key needed
 const TICKER_MAP = {
   "MSCI World CHF Hedged": "IWDC.SW",
-  "EQQQ Nasdaq 100":        "EQQQ.L",
+  "EQQQ Nasdaq 100":        "EQQQ.DE",   // XETRA, EUR → convert to CHF
   "Swissqoin (SWQ)":        null,
 };
+let gbpChf = 1.13;
+let eurChf = 0.96;
 
 async function getFxRates() {
   try {
-    const [usdRes, gbpRes] = await Promise.all([
+    const [usdRes, gbpRes, eurRes] = await Promise.all([
       fetch('https://api.frankfurter.app/latest?from=USD&to=CHF').then(r => r.json()),
       fetch('https://api.frankfurter.app/latest?from=GBP&to=CHF').then(r => r.json()),
+      fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF').then(r => r.json()),
     ]);
     if (usdRes?.rates?.CHF) state.usdRate = parseFloat(usdRes.rates.CHF.toFixed(4));
     if (gbpRes?.rates?.CHF) gbpChf = parseFloat(gbpRes.rates.CHF.toFixed(4));
+    if (eurRes?.rates?.CHF) eurChf = parseFloat(eurRes.rates.CHF.toFixed(4));
   } catch(e) {}
 }
 
@@ -1250,6 +1254,7 @@ async function fetchPrices(manual = false) {
         const { price, currency } = res.value;
         let priceCHF = price;
         if (currency === 'GBp' || currency === 'GBX') priceCHF = (price / 100) * gbpChf;
+        if (currency === 'EUR') priceCHF = price * eurChf;
         state.prices[sec] = parseFloat(priceCHF.toFixed(4));
         ok++;
       } else { fail++; }
