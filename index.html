@@ -771,13 +771,19 @@ let state = {
 async function save() {
   try { await window.storage.set('portfolio-state', JSON.stringify(state)); } catch(e) {}
 }
+const DATA_VERSION = 3; // bump this every time trades/dividends are updated
+
 async function load() {
   try {
     const r = await window.storage.get('portfolio-state');
     if (r) state = JSON.parse(r.value);
   } catch(e) {}
-  // Seed with real data if empty
-  if (!state.trades || state.trades.length === 0) seedData();
+  // Force reseed if version mismatch
+  if (!state.version || state.version < DATA_VERSION) {
+    seedData();
+    state.version = DATA_VERSION;
+    await save();
+  }
   render();
 }
 
