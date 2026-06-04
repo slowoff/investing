@@ -1220,7 +1220,7 @@ async function getFxRates() {
 }
 
 async function yahooPrice(ticker) {
-  const r = await fetch(`https://yf-proxy.slowoff.workers.dev/?ticker=${encodeURIComponent(ticker)}`);
+  const r = await fetch(`https://yf-proxy.rafael-ferreira-oliveira06.workers.dev/?ticker=${encodeURIComponent(ticker)}`);
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const data = await r.json();
   const meta = data?.chart?.result?.[0]?.meta;
