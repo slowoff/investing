@@ -68,32 +68,6 @@
     border-radius: 4px;
     border: 1px solid var(--blue-dim);
   }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .btn-refresh {
-    background: var(--surface);
-    border: 1px solid var(--border2);
-    border-radius: 6px;
-    color: var(--mid);
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 5px 12px;
-    cursor: pointer;
-    transition: all .15s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .btn-refresh:hover { border-color: var(--teal); color: var(--teal); }
-  .btn-refresh.loading { color: var(--amber); border-color: var(--amber); }
-  .btn-refresh.ok      { color: var(--green); border-color: var(--green); }
-  .btn-refresh.fail    { color: var(--red);   border-color: var(--red); }
-  .spin { display: inline-block; }
-  .spin.active { animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Tabs ── */
   .tabs {
@@ -540,12 +514,7 @@
     <h1>Portfolio Tracker</h1>
     <p>Rafael Ferreira Oliveira · Yuh / Swissquote · Goal: CHF 2,000/mo by 2044</p>
   </div>
-  <div class="header-right">
-    <button class="btn-refresh" id="refreshBtn" onclick="fetchPrices(true)">
-      <span class="spin" id="refreshSpin">⟳</span> Refresh prices
-    </button>
-    <span class="badge" id="lastUpdated">Loading...</span>
-  </div>
+  <span class="badge" id="lastUpdated">Loading...</span>
 </div>
 
 <div class="tabs">
@@ -592,6 +561,7 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">Current Positions</span>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--mid)">USD converted @ <span id="usdRate">0.88</span> CHF</span>
     </div>
     <table>
       <thead>
@@ -607,6 +577,9 @@
       </thead>
       <tbody id="positionsTable"></tbody>
     </table>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">USD/CHF RATE</span>
+      <input type="number" id="usdRateInput" step="0.001" style="width:100px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--amber);font-family:var(--mono);font-size:12px;padding:5px 8px;text-align:right;outline:none" oninput="updateUsdRate(this.value)">
     </div>
   </div>
 </div>
@@ -767,19 +740,13 @@ let state = {
 async function save() {
   try { await window.storage.set('portfolio-state', JSON.stringify(state)); } catch(e) {}
 }
-const DATA_VERSION = 4; // bump this every time trades/dividends are updated
-
 async function load() {
   try {
     const r = await window.storage.get('portfolio-state');
     if (r) state = JSON.parse(r.value);
   } catch(e) {}
-  // Force reseed if version mismatch
-  if (!state.version || state.version < DATA_VERSION) {
-    seedData();
-    state.version = DATA_VERSION;
-    await save();
-  }
+  // Seed with real data if empty
+  if (!state.trades || state.trades.length === 0) seedData();
   render();
 }
 
@@ -801,7 +768,6 @@ function seedData() {
     {id:12, date:"2026-05-13", sec:"Lockheed Martin (LMT)", type:"Sell", units:0.1140, price:512.53, ccy:"USD", fees:1.09},
     {id:13, date:"2026-05-21", sec:"iShares Core SPI",      type:"Sell", units:0.2228, price:161.64, ccy:"CHF", fees:1.03},
     {id:14, date:"2026-05-26", sec:"MSCI World CHF Hedged", type:"Buy",  units:1.9013, price:92.95,  ccy:"CHF", fees:1.27},
-    {id:15, date:"2026-06-02", sec:"MSCI World CHF Hedged", type:"Sell", units:1.0699, price:93.47,  ccy:"CHF", fees:1.15},
   ];
   state.dividends = [
     {id:1, date:"2026-03-31", sec:"iShares Core SPI", gross:0.08, tax:0.03},
@@ -827,7 +793,7 @@ function calcPositions() {
 }
 
 function totalInvested(pos) {
-  return Object.values(pos).reduce((a,p) => a + p.cost, 0);
+  return Object.values(pos).reduce((a,p) => p.units > 0.0001 ? a + p.cost : a, 0);
 }
 
 function portfolioValue(pos) {
@@ -872,6 +838,8 @@ function render() {
   renderDividends(divNet);
 
   document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleDateString('en-GB');
+  document.getElementById('usdRateInput').value = state.usdRate;
+  document.getElementById('usdRate').textContent = state.usdRate.toFixed(4);
   document.getElementById('tradeDate').valueAsDate = new Date();
   document.getElementById('divDate').valueAsDate = new Date();
 }
@@ -1194,100 +1162,7 @@ document.getElementById('editModal').addEventListener('click', function(e) {
   if (e.target === this) closeEdit();
 });
 
-// ── Live price fetching ────────────────────────────────────────────────────
-// Yahoo Finance via corsproxy.io — free, no key needed
-const TICKER_MAP = {
-  "MSCI World CHF Hedged": "IWDC.SW",
-  "EQQQ Nasdaq 100":        "EQQQ.L",    // LSE GBp → convert via live GBP/CHF
-  "Swissqoin (SWQ)":        null,
-};
-const FORCE_CHF = new Set([]);
-let gbpChf = 0.865;
-let eurChf = 0.96;
-
-async function getFxRates() {
-  try {
-    const [usdRes, gbpRes, eurRes] = await Promise.all([
-      fetch('https://api.frankfurter.app/latest?from=USD&to=CHF').then(r => r.json()),
-      fetch('https://api.frankfurter.app/latest?from=GBP&to=CHF').then(r => r.json()),
-      fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF').then(r => r.json()),
-    ]);
-    if (usdRes?.rates?.CHF) state.usdRate = parseFloat(usdRes.rates.CHF.toFixed(4));
-    if (gbpRes?.rates?.CHF) gbpChf = parseFloat(gbpRes.rates.CHF.toFixed(4));
-    if (eurRes?.rates?.CHF) eurChf = parseFloat(eurRes.rates.CHF.toFixed(4));
-  } catch(e) {}
-}
-
-async function yahooPrice(ticker) {
-  const r = await fetch(`https://yf-proxy.rafael-ferreira-oliveira06.workers.dev/?ticker=${encodeURIComponent(ticker)}`);
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  const data = await r.json();
-  const meta = data?.chart?.result?.[0]?.meta;
-  if (!meta?.regularMarketPrice) throw new Error('no price');
-  return { price: meta.regularMarketPrice, currency: meta.currency };
-}
-
-async function fetchPrices(manual = false) {
-  const btn  = document.getElementById('refreshBtn');
-  const spin = document.getElementById('refreshSpin');
-  btn.classList.add('loading'); btn.classList.remove('ok','fail');
-  spin.classList.add('active');
-  btn.disabled = true;
-
-  let ok = 0, fail = 0;
-  try {
-    // FX rates via Frankfurter (no proxy needed)
-    await getFxRates();
-
-    // Stock prices in parallel
-    const entries = Object.entries(TICKER_MAP).filter(([,t])=>t);
-    const results = await Promise.allSettled(entries.map(([sec, ticker]) => yahooPrice(ticker).then(r => ({sec, ...r}))));
-
-    results.forEach((res, i) => {
-      const [sec] = entries[i];
-      if (res.status === 'fulfilled') {
-        const { price, currency } = res.value;
-        let priceCHF = price;
-        if (!FORCE_CHF.has(TICKER_MAP[sec])) {
-          if (currency === 'GBp' || currency === 'GBX') priceCHF = (price / 100) * gbpChf;
-          if (currency === 'EUR') priceCHF = price * eurChf;
-          if (currency === 'USD') priceCHF = price * state.usdRate;
-        }
-        state.prices[sec] = parseFloat(priceCHF.toFixed(4));
-        ok++;
-      } else { fail++; }
-    });
-  } catch(e) { fail++; }
-
-  await save();
-  render();
-
-  spin.classList.remove('active');
-  btn.disabled = false;
-  if (fail === 0) {
-    btn.classList.add('ok');
-    toast('Prices updated ✓');
-  } else if (ok > 0) {
-    btn.classList.add('ok');
-    toast(`${ok} updated, ${fail} failed`);
-  } else {
-    btn.classList.add('fail');
-    toast('Price fetch failed — enter manually');
-  }
-  setTimeout(() => btn.classList.remove('ok','fail','loading'), 3000);
-
-  state.lastPriceFetch = new Date().toISOString();
-  await save();
-}
-
-// Auto-fetch on open, but throttle: skip if last fetch was <5 min ago
-async function maybeAutoFetch() {
-  if (!state.lastPriceFetch) { fetchPrices(); return; }
-  const age = (Date.now() - new Date(state.lastPriceFetch)) / 1000 / 60; // minutes
-  if (age > 5) fetchPrices();
-}
-
-load().then(() => fetchPrices());
+load();
 </script>
 </body>
 </html>
