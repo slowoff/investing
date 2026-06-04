@@ -872,8 +872,6 @@ function render() {
   renderDividends(divNet);
 
   document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleDateString('en-GB');
-  document.getElementById('usdRateInput').value = state.usdRate;
-  document.getElementById('usdRate').textContent = state.usdRate.toFixed(4);
   document.getElementById('tradeDate').valueAsDate = new Date();
   document.getElementById('divDate').valueAsDate = new Date();
 }
@@ -1289,7 +1287,7 @@ async function maybeAutoFetch() {
   if (age > 5) fetchPrices();
 }
 
-load().then ? load().then(maybeAutoFetch) : (load(), setTimeout(maybeAutoFetch, 300));
+load().then(() => fetchPrices());
 </script>
 </body>
 </html>
