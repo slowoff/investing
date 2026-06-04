@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rafael — Portfolio Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #111118;
+    --surface2: #18181f;
+    --border:   #1e1e2a;
+    --border2:  #2a2a3a;
+    --navy:     #1E3A5F;
+    --blue:     #3b82f6;
+    --blue-dim: #1e3a5f;
+    --teal:     #14b8a6;
+    --green:    #22c55e;
+    --red:      #ef4444;
+    --amber:    #f59e0b;
+    --purple:   #a855f7;
+    --white:    #f1f5f9;
+    --mid:      #64748b;
+    --muted:    #334155;
+    --font:     'DM Sans', sans-serif;
+    --mono:     'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--white);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  /* ── Layout ── */
+  .header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .header-left h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--white);
+  }
+  .header-left p {
+    font-size: 12px;
+    color: var(--mid);
+    font-family: var(--mono);
+    margin-top: 4px;
+  }
+  .badge {
+    background: var(--blue-dim);
+    color: var(--blue);
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--blue-dim);
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-refresh {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--mid);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-refresh:hover { border-color: var(--teal); color: var(--teal); }
+  .btn-refresh.loading { color: var(--amber); border-color: var(--amber); }
+  .btn-refresh.ok      { color: var(--green); border-color: var(--green); }
+  .btn-refresh.fail    { color: var(--red);   border-color: var(--red); }
+  .spin { display: inline-block; }
+  .spin.active { animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    width: fit-content;
+  }
+  .tab {
+    padding: 8px 18px;
+    border-radius: 7px;
+    border: none;
+    background: none;
+    color: var(--mid);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .tab.active {
+    background: var(--surface2);
+    color: var(--white);
+    border: 1px solid var(--border2);
+  }
+  .tab:hover:not(.active) { color: var(--white); }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.blue::before   { background: var(--blue); }
+  .kpi-card.teal::before   { background: var(--teal); }
+  .kpi-card.green::before  { background: var(--green); }
+  .kpi-card.amber::before  { background: var(--amber); }
+  .kpi-card.purple::before { background: var(--purple); }
+  .kpi-card.red::before    { background: var(--red); }
+
+  .kpi-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--mid);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--mono);
+    letter-spacing: -0.5px;
+  }
+  .kpi-value.blue   { color: var(--blue); }
+  .kpi-value.teal   { color: var(--teal); }
+  .kpi-value.green  { color: var(--green); }
+  .kpi-value.amber  { color: var(--amber); }
+  .kpi-value.purple { color: var(--purple); }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--mid);
+    font-family: var(--mono);
+    margin-top: 4px;
+  }
+
+  /* ── Progress bar ── */
+  .progress-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .progress-header span:first-child {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--mid);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .progress-pct {
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--blue);
+    font-weight: 500;
+  }
+  .progress-track {
+    background: var(--border2);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--teal));
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(.4,0,.2,1);
+  }
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+  .progress-labels span {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+
+  /* ── Trigger pills ── */
+  .triggers {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .trigger-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .trigger-dot.pending { background: var(--muted); }
+  .trigger-dot.done    { background: var(--green); }
+  .trigger-text { font-size: 12px; color: var(--mid); }
+  .trigger-text strong { color: var(--amber); font-weight: 500; }
+  .trigger-away { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-left: auto; }
+
+  /* ── Two-col layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  /* ── Positions table ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--mid);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    padding: 10px 20px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  thead th:not(:first-child) { text-align: right; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td {
+    padding: 12px 20px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  td:not(:first-child) { text-align: right; font-family: var(--mono); }
+  .sec-name { font-weight: 500; color: var(--white); font-size: 13px; }
+  .sec-type {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    background: var(--border);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+  }
+  .price-input {
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.25);
+    border-radius: 5px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    width: 80px;
+    text-align: right;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .price-input:focus { border-color: var(--amber); }
+  .gain-pos { color: var(--green); }
+  .gain-neg { color: var(--red); }
+  .gain-neu { color: var(--mid); }
+
+  /* ── Pie chart ── */
+  .pie-wrap { padding: 20px; display: flex; flex-direction: column; align-items: center; }
+  canvas { max-width: 200px; max-height: 200px; }
+  .pie-legend { width: 100%; margin-top: 16px; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .legend-item:last-child { border-bottom: none; }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .legend-name { flex: 1; color: var(--mid); }
+  .legend-pct { font-family: var(--mono); color: var(--white); font-size: 11px; }
+
+  /* ── Add Trade Form ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px; }
+  .form-group label {
+    display: block;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--mid);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    color: var(--white);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--blue); }
+  .form-group select option { background: var(--surface2); }
+  .form-full { grid-column: 1 / -1; }
+  .btn-add {
+    width: 100%;
+    background: var(--blue);
+    color: white;
+    border: none;
+    border-radius: 7px;
+    padding: 11px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+    margin-top: 4px;
+  }
+  .btn-add:hover { opacity: .85; }
+  .btn-add:active { opacity: .7; }
+
+  /* ── Trade history ── */
+  .trades-wrap { padding: 0; }
+  .trade-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 90px 90px 80px 90px 80px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    align-items: center;
+    transition: background .1s;
+  }
+  .trade-row:hover { background: var(--surface2); }
+  .trade-row:last-child { border-bottom: none; }
+  .trade-row.header {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .buy-badge {
+    background: rgba(34,197,94,.12);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    width: fit-content;
+  }
+  .trade-mono { font-family: var(--mono); color: var(--mid); }
+  .trade-actions { display: flex; gap: 6px; }
+  .btn-edit {
+    background: rgba(59,130,246,.12); color: var(--blue);
+    border: 1px solid rgba(59,130,246,.25); border-radius: 5px;
+    font-size: 11px; font-family: var(--mono); padding: 3px 8px;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-edit:hover { background: rgba(59,130,246,.25); }
+  .btn-del {
+    background: rgba(239,68,68,.10); color: var(--red);
+    border: 1px solid rgba(239,68,68,.2); border-radius: 5px;
+    font-size: 11px; font-family: var(--mono); padding: 3px 8px;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-del:hover { background: rgba(239,68,68,.22); }
+
+  /* ── Edit modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.7); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    width: 480px; max-width: 95vw;
+    padding: 24px;
+  }
+  .modal-title {
+    font-size: 14px; font-weight: 600;
+    margin-bottom: 20px; color: var(--white);
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-save {
+    flex: 1; background: var(--blue); color: white; border: none;
+    border-radius: 7px; padding: 10px; font-family: var(--font);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  }
+  .btn-save:hover { opacity: .85; }
+  .btn-cancel {
+    flex: 1; background: var(--surface2); color: var(--mid);
+    border: 1px solid var(--border2); border-radius: 7px; padding: 10px;
+    font-family: var(--font); font-size: 13px; cursor: pointer; transition: opacity .15s;
+  }
+  .btn-cancel:hover { opacity: .75; }
+
+  /* ── Dividends ── */
+  .div-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 80px 80px 90px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    align-items: center;
+  }
+  .div-row:last-child { border-bottom: none; }
+  .div-row.header {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all .3s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Section visibility ── */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .page-header-note {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col  { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Portfolio Tracker</h1>
+    <p>Rafael Ferreira Oliveira · Yuh / Swissquote · Goal: CHF 2,000/mo by 2044</p>
+  </div>
+  <div class="header-right">
+    <button class="btn-refresh" id="refreshBtn" onclick="fetchPrices(true)">
+      <span class="spin" id="refreshSpin">⟳</span> Refresh prices
+    </button>
+    <span class="badge" id="lastUpdated">Loading...</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
+  <button class="tab" onclick="showTab('positions')">Positions</button>
+  <button class="tab" onclick="showTab('add')">Add Trade</button>
+  <button class="tab" onclick="showTab('history')">History</button>
+  <button class="tab" onclick="showTab('dividends')">Dividends</button>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="tab-dashboard" class="section active">
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="progress-card">
+    <div class="progress-header">
+      <span>PROGRESS TO CHF 480,000</span>
+      <span class="progress-pct" id="progressPct">0.00%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="progress-labels">
+      <span id="progressVal">CHF 0</span>
+      <span>CHF 480,000 goal</span>
+    </div>
+  </div>
+  <div class="triggers" id="triggersEl"></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Allocation</span></div>
+      <div class="pie-wrap">
+        <canvas id="pieCanvas" width="200" height="200"></canvas>
+        <div class="pie-legend" id="pieLegend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Monthly Invested (CHF)</span></div>
+      <div id="barChart" style="padding:24px 20px;display:flex;align-items:flex-end;gap:16px;height:240px;box-sizing:border-box"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── POSITIONS ── -->
+<div id="tab-positions" class="section">
+  <p class="page-header-note">★ Enter current price in the yellow field — value & gain/loss update instantly</p>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Current Positions</span>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--mid)">USD converted @ <span id="usdRate">0.88</span> CHF</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Security</th>
+          <th>Units</th>
+          <th>Avg Buy</th>
+          <th>Current Price ★</th>
+          <th>Value CHF</th>
+          <th>Gain/Loss</th>
+          <th>%</th>
+        </tr>
+      </thead>
+      <tbody id="positionsTable"></tbody>
+    </table>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">USD/CHF RATE</span>
+      <input type="number" id="usdRateInput" step="0.001" style="width:100px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--amber);font-family:var(--mono);font-size:12px;padding:5px 8px;text-align:right;outline:none" oninput="updateUsdRate(this.value)">
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD TRADE ── -->
+<div id="tab-add" class="section">
+  <div class="card" style="max-width:560px">
+    <div class="card-header"><span class="card-title">Add New Trade</span></div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="tradeDate">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="tradeType">
+          <option value="Buy">Buy</option>
+          <option value="Sell">Sell</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label>Security</label>
+        <select id="tradeSec">
+          <option value="MSCI World CHF Hedged">MSCI World CHF Hedged</option>
+          <option value="EQQQ Nasdaq 100">EQQQ Nasdaq 100</option>
+          <option value="iShares Core SPI">iShares Core SPI</option>
+          <option value="Palantir (PLTR)">Palantir (PLTR)</option>
+          <option value="Lockheed Martin (LMT)">Lockheed Martin (LMT)</option>
+          <option value="Swissqoin (SWQ)">Swissqoin (SWQ)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Units</label>
+        <input type="number" id="tradeUnits" step="0.0001" placeholder="0.0000">
+      </div>
+      <div class="form-group">
+        <label>Price per unit</label>
+        <input type="number" id="tradePrice" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select id="tradeCcy">
+          <option value="CHF">CHF</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Fees + Tax</label>
+        <input type="number" id="tradeFees" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group form-full">
+        <button class="btn-add" onclick="addTrade()">Add Trade</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HISTORY ── -->
+<div id="tab-history" class="section">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">All Trades</span>
+      <span style="font-size:11px;font-family:var(--mono);color:var(--mid)" id="tradeCount">0 trades</span>
+    </div>
+    <div class="trades-wrap">
+      <div class="trade-row header">
+        <span>DATE</span><span>SECURITY</span><span>UNITS</span>
+        <span>PRICE</span><span>CCY</span><span>TOTAL</span><span>ACTIONS</span>
+      </div>
+      <div id="tradeList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DIVIDENDS ── -->
+<div id="tab-dividends" class="section">
+  <div class="card" style="max-width:560px;margin-bottom:20px">
+    <div class="card-header"><span class="card-title">Add Dividend</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Date</label><input type="date" id="divDate"></div>
+      <div class="form-group">
+        <label>Security</label>
+        <select id="divSec">
+          <option>MSCI World CHF Hedged</option>
+          <option>EQQQ Nasdaq 100</option>
+          <option selected>iShares Core SPI</option>
+          <option>Palantir (PLTR)</option>
+          <option>Lockheed Martin (LMT)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Gross (CHF)</label><input type="number" id="divGross" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Tax Withheld</label><input type="number" id="divTax" step="0.01" placeholder="0.00"></div>
+      <div class="form-group form-full"><button class="btn-add" onclick="addDividend()">Add Dividend</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Dividend History</span>
+      <span style="font-size:13px;font-family:var(--mono);color:var(--green);font-weight:600" id="divTotal">CHF 0.00</span>
+    </div>
+    <div>
+      <div class="div-row header">
+        <span>DATE</span><span>SECURITY</span><span>GROSS</span><span>TAX</span><span>NET CHF</span>
+      </div>
+      <div id="divList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Modal ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title">Edit Trade</div>
+    <div class="form-grid" style="padding:0">
+      <div class="form-group"><label>Date</label><input type="date" id="editDate"></div>
+      <div class="form-group"><label>Type</label>
+        <select id="editType"><option value="Buy">Buy</option><option value="Sell">Sell</option></select>
+      </div>
+      <div class="form-group form-full"><label>Security</label>
+        <select id="editSec">
+          <option>MSCI World CHF Hedged</option><option>EQQQ Nasdaq 100</option>
+          <option>iShares Core SPI</option><option>Palantir (PLTR)</option>
+          <option>Lockheed Martin (LMT)</option><option>Swissqoin (SWQ)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Units</label><input type="number" id="editUnits" step="0.0001"></div>
+      <div class="form-group"><label>Price per unit</label><input type="number" id="editPrice" step="0.01"></div>
+      <div class="form-group"><label>Currency</label>
+        <select id="editCcy"><option value="CHF">CHF</option><option value="USD">USD</option></select>
+      </div>
+      <div class="form-group"><label>Fees + Tax</label><input type="number" id="editFees" step="0.01"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="btn-save" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const GOAL = 480000;
+const SECS = ["MSCI World CHF Hedged","EQQQ Nasdaq 100","iShares Core SPI","Palantir (PLTR)","Lockheed Martin (LMT)","Swissqoin (SWQ)"];
+const COLORS = ["#3b82f6","#14b8a6","#a855f7","#f59e0b","#ef4444","#64748b"];
+const TYPES  = {"MSCI World CHF Hedged":"ETF","EQQQ Nasdaq 100":"ETF","iShares Core SPI":"ETF","Palantir (PLTR)":"Stock","Lockheed Martin (LMT)":"Stock","Swissqoin (SWQ)":"Crypto"};
+const CCYS   = {"MSCI World CHF Hedged":"CHF","EQQQ Nasdaq 100":"CHF","iShares Core SPI":"CHF","Palantir (PLTR)":"USD","Lockheed Martin (LMT)":"USD","Swissqoin (SWQ)":"CHF"};
+
+let state = {
+  trades: [],
+  dividends: [],
+  prices: {},
+  usdRate: 0.88
+};
+
+// ── Storage ────────────────────────────────────────────────────────────────
+async function save() {
+  try { await window.storage.set('portfolio-state', JSON.stringify(state)); } catch(e) {}
+}
+async function load() {
+  try {
+    const r = await window.storage.get('portfolio-state');
+    if (r) state = JSON.parse(r.value);
+  } catch(e) {}
+  // Seed with real data if empty
+  if (!state.trades || state.trades.length === 0) seedData();
+  render();
+}
+
+function seedData() {
+  state.trades = [
+    // ── March 2026 ──
+    {id:1,  date:"2026-03-04", sec:"MSCI World CHF Hedged", type:"Buy",  units:0.5163, price:86.06,  ccy:"CHF", fees:0.07},
+    {id:2,  date:"2026-03-05", sec:"EQQQ Nasdaq 100",       type:"Buy",  units:0.1228, price:399.10, ccy:"CHF", fees:0.07},
+    {id:3,  date:"2026-03-05", sec:"MSCI World CHF Hedged", type:"Buy",  units:1.0394, price:86.59,  ccy:"CHF", fees:0.14},
+    {id:4,  date:"2026-03-06", sec:"Palantir (PLTR)",       type:"Buy",  units:0.1101, price:160.09, ccy:"USD", fees:1.03},
+    {id:5,  date:"2026-03-10", sec:"EQQQ Nasdaq 100",       type:"Buy",  units:0.0997, price:401.15, ccy:"CHF", fees:1.06},
+    {id:6,  date:"2026-03-10", sec:"Palantir (PLTR)",       type:"Buy",  units:0.6504, price:153.74, ccy:"USD", fees:1.15},
+    {id:7,  date:"2026-03-10", sec:"Lockheed Martin (LMT)", type:"Buy",  units:0.1140, price:658.00, ccy:"USD", fees:1.11},
+    {id:8,  date:"2026-03-25", sec:"MSCI World CHF Hedged", type:"Buy",  units:1.1963, price:83.59,  ccy:"CHF", fees:1.15},
+    {id:9,  date:"2026-03-25", sec:"EQQQ Nasdaq 100",       type:"Buy",  units:0.2071, price:386.30, ccy:"CHF", fees:1.12},
+    {id:10, date:"2026-03-25", sec:"iShares Core SPI",      type:"Buy",  units:0.2228, price:153.42, ccy:"CHF", fees:1.03},
+    // ── May 2026 ──
+    {id:11, date:"2026-05-13", sec:"Palantir (PLTR)",       type:"Sell", units:0.7605, price:134.55, ccy:"USD", fees:1.15},
+    {id:12, date:"2026-05-13", sec:"Lockheed Martin (LMT)", type:"Sell", units:0.1140, price:512.53, ccy:"USD", fees:1.09},
+    {id:13, date:"2026-05-21", sec:"iShares Core SPI",      type:"Sell", units:0.2228, price:161.64, ccy:"CHF", fees:1.03},
+    {id:14, date:"2026-05-26", sec:"MSCI World CHF Hedged", type:"Buy",  units:1.9013, price:92.95,  ccy:"CHF", fees:1.27},
+  ];
+  state.dividends = [
+    {id:1, date:"2026-03-31", sec:"iShares Core SPI", gross:0.08, tax:0.03},
+    {id:2, date:"2026-04-14", sec:"iShares Core SPI", gross:0.11, tax:0.04},
+    {id:3, date:"2026-04-22", sec:"iShares Core SPI", gross:0.25, tax:0.09},
+    {id:4, date:"2026-05-13", sec:"iShares Core SPI", gross:0.09, tax:0.03},
+  ];
+  state.prices = {};
+  state.usdRate = 0.88;
+}
+
+// ── Calculations ───────────────────────────────────────────────────────────
+function calcPositions() {
+  const pos = {};
+  SECS.forEach(s => pos[s] = {units:0, cost:0});
+  state.trades.forEach(t => {
+    if (!pos[t.sec]) pos[t.sec] = {units:0, cost:0};
+    const totalCHF = (t.units * t.price + (t.fees||0)) * (t.ccy==='USD' ? state.usdRate : 1);
+    if (t.type === 'Buy')  { pos[t.sec].units += t.units; pos[t.sec].cost += totalCHF; }
+    if (t.type === 'Sell') { pos[t.sec].units -= t.units; pos[t.sec].cost -= totalCHF; }
+  });
+  return pos;
+}
+
+function totalInvested(pos) {
+  return Object.values(pos).reduce((a,p) => a + p.cost, 0);
+}
+
+function portfolioValue(pos) {
+  let total = 0;
+  SECS.forEach(s => {
+    const p = pos[s]; if (!p || p.units <= 0) return;
+    const cp = parseFloat(state.prices[s] || 0);
+    if (cp > 0) {
+      const val = p.units * cp * (CCYS[s]==='USD' ? state.usdRate : 1);
+      total += val;
+    } else {
+      total += p.cost;
+    }
+  });
+  return total;
+}
+
+function fmtCHF(n, decimals=2) {
+  if (isNaN(n)) return '—';
+  return 'CHF ' + n.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+function fmtNum(n, dec=4) {
+  return parseFloat(n).toFixed(dec);
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  const pos   = calcPositions();
+  const cost  = totalInvested(pos);
+  const value = portfolioValue(pos);
+  const gain  = value - cost;
+  const gainPct = cost > 0 ? (gain/cost)*100 : 0;
+  const divNet  = state.dividends.reduce((a,d) => a + (d.gross - d.tax), 0);
+
+  renderKPIs(value, cost, gain, gainPct, divNet);
+  renderProgress(value);
+  renderTriggers(value);
+  renderPie(pos, value);
+  renderBar();
+  renderPositions(pos);
+  renderTrades();
+  renderDividends(divNet);
+
+  document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleDateString('en-GB');
+  document.getElementById('usdRateInput').value = state.usdRate;
+  document.getElementById('usdRate').textContent = state.usdRate.toFixed(4);
+  document.getElementById('tradeDate').valueAsDate = new Date();
+  document.getElementById('divDate').valueAsDate = new Date();
+}
+
+function renderKPIs(value, cost, gain, gainPct, divNet) {
+  const pct = (value/GOAL*100).toFixed(2);
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card blue">
+      <div class="kpi-label">Portfolio Value</div>
+      <div class="kpi-value blue">${fmtCHF(value)}</div>
+      <div class="kpi-sub">${pct}% of goal</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Total Invested</div>
+      <div class="kpi-value teal">${fmtCHF(cost)}</div>
+      <div class="kpi-sub">${state.trades.filter(t=>t.type==='Buy').length} buys total</div>
+    </div>
+    <div class="kpi-card ${gain>=0?'green':'red'}">
+      <div class="kpi-label">Unrealised Gain</div>
+      <div class="kpi-value ${gain>=0?'green':''}` + (gain<0?'" style="color:var(--red)"':'"') + `>${gain>=0?'+':''}${fmtCHF(gain)}</div>
+      <div class="kpi-sub">${gainPct>=0?'+':''}${gainPct.toFixed(2)}%</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Dividends Received</div>
+      <div class="kpi-value amber">${fmtCHF(divNet)}</div>
+      <div class="kpi-sub">${state.dividends.length} payments</div>
+    </div>
+  `;
+}
+
+function renderProgress(value) {
+  const pct = Math.min(value/GOAL*100, 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent  = pct.toFixed(4) + '%';
+  document.getElementById('progressVal').textContent  = fmtCHF(value,0);
+}
+
+function renderTriggers(value) {
+  const trgs = [
+    {at:80000,  label:"Add VHYL",                   desc:"First dividend ETF — 20–25% alloc"},
+    {at:200000, label:"Rotate 40% → VHYL + FGEQ",   desc:"Blended yield 4.5–5%"},
+    {at:450000, label:"Stop reinvesting",             desc:"Collect dividends, file DA-1"},
+  ];
+  document.getElementById('triggersEl').innerHTML = trgs.map(t => {
+    const done = value >= t.at;
+    const away = fmtCHF(t.at - value, 0);
+    return `<div class="trigger">
+      <div class="trigger-dot ${done?'done':'pending'}"></div>
+      <div class="trigger-text"><strong>CHF ${(t.at/1000).toFixed(0)}k</strong> · ${t.label}<br><span style="font-size:10px">${t.desc}</span></div>
+      <div class="trigger-away">${done ? '✅ done' : away + ' away'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPie(pos, totalVal) {
+  const canvas = document.getElementById('pieCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 200; canvas.height = 200;
+  ctx.clearRect(0,0,200,200);
+
+  const data = SECS.map((s,i) => {
+    const p = pos[s]; if (!p || p.units <= 0) return null;
+    const cp = parseFloat(state.prices[s]||0);
+    const val = cp > 0 ? p.units*cp*(CCYS[s]==='USD'?state.usdRate:1) : p.cost;
+    return {name:s, val, color:COLORS[i]};
+  }).filter(Boolean);
+
+  const total = data.reduce((a,d)=>a+d.val,0);
+  if (total <= 0) return;
+
+  let startAngle = -Math.PI/2;
+  data.forEach(d => {
+    const slice = (d.val/total)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(100,100);
+    ctx.arc(100,100,90,startAngle,startAngle+slice);
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+    startAngle += slice;
+  });
+  // Donut hole
+  ctx.beginPath();
+  ctx.arc(100,100,52,0,Math.PI*2);
+  ctx.fillStyle = '#111118';
+  ctx.fill();
+  // Center text
+  ctx.fillStyle = '#f1f5f9';
+  ctx.font = '700 17px DM Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(fmtCHF(total,0).replace('CHF ',''), 100, 95);
+  ctx.font = '500 11px DM Mono, monospace';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('CHF total', 100, 113);
+
+  // Legend
+  document.getElementById('pieLegend').innerHTML = data.map(d => `
+    <div class="legend-item">
+      <div style="display:flex;align-items:center;flex:1">
+        <div class="legend-dot" style="background:${d.color}"></div>
+        <span class="legend-name">${d.name}</span>
+      </div>
+      <span class="legend-pct">${((d.val/total)*100).toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+function renderBar() {
+  const container = document.getElementById('barChart');
+  if (!container) return;
+
+  const months = {};
+  state.trades.forEach(t => {
+    if (t.type !== 'Buy') return;
+    const d   = new Date(t.date);
+    const key = d.toLocaleString('en-GB', {month:'short', year:'numeric'});
+    const chf = (t.units * t.price + (t.fees||0)) * (t.ccy==='USD' ? state.usdRate : 1);
+    months[key] = (months[key]||0) + chf;
+  });
+
+  const labels = Object.keys(months);
+  const values = Object.values(months);
+  if (!labels.length) { container.innerHTML = ''; return; }
+
+  const maxV    = Math.max(...values);
+  const chartH  = 160; // px available for bars
+
+  container.innerHTML = labels.map((lbl, i) => {
+    const pct   = (values[i] / maxV) * 100;
+    const barPx = Math.round((values[i] / maxV) * chartH);
+    return `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;height:${chartH + 56}px">
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700;color:#f1f5f9;white-space:nowrap">
+          CHF ${Math.round(values[i])}
+        </div>
+        <div style="
+          width:100%;
+          max-width:90px;
+          height:${barPx}px;
+          background:linear-gradient(to bottom,#14b8a6,#0d9488);
+          border-radius:6px 6px 0 0;
+          min-height:8px;
+        "></div>
+        <div style="font-family:var(--mono);font-size:12px;color:#94a3b8;white-space:nowrap">
+          ${lbl}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderPositions(pos) {
+  const tbody = document.getElementById('positionsTable');
+  tbody.innerHTML = SECS.map((s,i) => {
+    const p = pos[s];
+    if (!p || p.units < 0.0001) return '';
+    const cp = parseFloat(state.prices[s]||'');
+    const ccy = CCYS[s];
+    const avgBuy = p.units > 0 ? p.cost / p.units / (ccy==='USD'?state.usdRate:1) : 0;
+    let valCHF = p.cost, gainCHF = 0, gainPct = 0;
+    if (cp > 0) {
+      valCHF  = p.units * cp * (ccy==='USD' ? state.usdRate : 1);
+      gainCHF = valCHF - p.cost;
+      gainPct = (gainCHF / p.cost) * 100;
+    }
+    const gainClass = gainCHF > 0 ? 'gain-pos' : gainCHF < 0 ? 'gain-neg' : 'gain-neu';
+    return `<tr>
+      <td><span class="sec-name">${s}</span><span class="sec-type">${TYPES[s]}</span></td>
+      <td>${fmtNum(p.units)}</td>
+      <td>${fmtNum(avgBuy,2)} ${ccy}</td>
+      <td><input class="price-input" type="number" placeholder="enter price" value="${state.prices[s]||''}"
+          onchange="setPrice('${s}',this.value)" step="0.01"></td>
+      <td>${cp > 0 ? fmtCHF(valCHF) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="${gainClass}">${cp > 0 ? (gainCHF>=0?'+':'') + fmtCHF(gainCHF) : '—'}</td>
+      <td class="${gainClass}">${cp > 0 ? (gainPct>=0?'+':'') + gainPct.toFixed(2)+'%' : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderTrades() {
+  const sorted = [...state.trades].sort((a,b) => new Date(b.date)-new Date(a.date));
+  document.getElementById('tradeCount').textContent = sorted.length + ' trades';
+  document.getElementById('tradeList').innerHTML = sorted.map(t => {
+    const total = (t.units * t.price + (t.fees||0));
+    return `<div class="trade-row">
+      <span class="trade-mono">${t.date}</span>
+      <span>${t.sec}</span>
+      <span class="trade-mono">${fmtNum(t.units)}</span>
+      <span class="trade-mono">${fmtNum(t.price,2)} ${t.ccy}</span>
+      <span><div class="buy-badge">${t.type}</div></span>
+      <span class="trade-mono">${fmtNum(total,2)} ${t.ccy}</span>
+      <span class="trade-actions">
+        <button class="btn-edit" onclick="openEdit(${t.id})">Edit</button>
+        <button class="btn-del"  onclick="deleteTrade(${t.id})">Del</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function renderDividends(net) {
+  document.getElementById('divTotal').textContent = 'CHF ' + net.toFixed(2) + ' net';
+  const sorted = [...state.dividends].sort((a,b) => new Date(b.date)-new Date(a.date));
+  document.getElementById('divList').innerHTML = sorted.map(d => {
+    const netD = d.gross - d.tax;
+    return `<div class="div-row">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--mid)">${d.date}</span>
+      <span style="font-size:13px">${d.sec}</span>
+      <span style="font-family:var(--mono);font-size:12px">${d.gross.toFixed(2)} CHF</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--red)">-${d.tax.toFixed(2)} CHF</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--green)">+${netD.toFixed(2)} CHF</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────
+function setPrice(sec, val) {
+  state.prices[sec] = parseFloat(val) || '';
+  save(); render();
+}
+
+function updateUsdRate(val) {
+  state.usdRate = parseFloat(val) || 0.88;
+  save(); render();
+}
+
+function addTrade() {
+  const date  = document.getElementById('tradeDate').value;
+  const type  = document.getElementById('tradeType').value;
+  const sec   = document.getElementById('tradeSec').value;
+  const units = parseFloat(document.getElementById('tradeUnits').value);
+  const price = parseFloat(document.getElementById('tradePrice').value);
+  const ccy   = document.getElementById('tradeCcy').value;
+  const fees  = parseFloat(document.getElementById('tradeFees').value)||0;
+  if (!date || !units || !price) { toast('Fill in all fields'); return; }
+  state.trades.push({id: Date.now(), date, sec, type, units, price, ccy, fees});
+  document.getElementById('tradeUnits').value = '';
+  document.getElementById('tradePrice').value = '';
+  document.getElementById('tradeFees').value  = '';
+  save(); render();
+  toast('Trade added ✓');
+}
+
+function addDividend() {
+  const date  = document.getElementById('divDate').value;
+  const sec   = document.getElementById('divSec').value;
+  const gross = parseFloat(document.getElementById('divGross').value);
+  const tax   = parseFloat(document.getElementById('divTax').value)||0;
+  if (!date || !gross) { toast('Fill in date and gross amount'); return; }
+  state.dividends.push({id: Date.now(), date, sec, gross, tax});
+  document.getElementById('divGross').value = '';
+  document.getElementById('divTax').value   = '';
+  save(); render();
+  toast('Dividend logged ✓');
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.target.classList.add('active');
+  if (id === 'dashboard') { setTimeout(renderBar, 50); }
+}
+
+window.addEventListener('resize', () => { renderBar(); });
+
+let editingId = null;
+
+function openEdit(id) {
+  const t = state.trades.find(t => t.id === id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('editDate').value  = t.date;
+  document.getElementById('editType').value  = t.type;
+  document.getElementById('editSec').value   = t.sec;
+  document.getElementById('editUnits').value = t.units;
+  document.getElementById('editPrice').value = t.price;
+  document.getElementById('editCcy').value   = t.ccy;
+  document.getElementById('editFees').value  = t.fees || 0;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit() {
+  editingId = null;
+  document.getElementById('editModal').classList.remove('open');
+}
+
+function saveEdit() {
+  if (!editingId) return;
+  const idx = state.trades.findIndex(t => t.id === editingId);
+  if (idx === -1) return;
+  state.trades[idx] = {
+    id:    editingId,
+    date:  document.getElementById('editDate').value,
+    type:  document.getElementById('editType').value,
+    sec:   document.getElementById('editSec').value,
+    units: parseFloat(document.getElementById('editUnits').value),
+    price: parseFloat(document.getElementById('editPrice').value),
+    ccy:   document.getElementById('editCcy').value,
+    fees:  parseFloat(document.getElementById('editFees').value) || 0,
+  };
+  closeEdit(); save(); render();
+  toast('Trade updated ✓');
+}
+
+function deleteTrade(id) {
+  if (!confirm('Delete this trade?')) return;
+  state.trades = state.trades.filter(t => t.id !== id);
+  save(); render();
+  toast('Trade deleted');
+}
+
+// Close modal on overlay click
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEdit();
+});
+
+// ── Live price fetching ────────────────────────────────────────────────────
+// Yahoo Finance via corsproxy.io — free, no key needed
+const TICKER_MAP = {
+  "MSCI World CHF Hedged": "IWDC.SW",   // SIX Swiss Exchange, CHF
+  "EQQQ Nasdaq 100":        "EQQQ.L",   // LSE in GBp → convert ÷100 then ×GBP/CHF
+  "Swissqoin (SWQ)":        null,        // not on Yahoo, skip
+};
+// GBP/CHF is fetched dynamically; fallback value
+let gbpChf = 1.13;
+
+async function yahooPrice(ticker) {
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
+  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const wrapper = await r.json();
+  const data = JSON.parse(wrapper.contents);
+  const meta = data?.chart?.result?.[0]?.meta;
+  if (!meta?.regularMarketPrice) throw new Error('no price');
+  return { price: meta.regularMarketPrice, currency: meta.currency };
+}
+
+async function fetchPrices(manual = false) {
+  const btn  = document.getElementById('refreshBtn');
+  const spin = document.getElementById('refreshSpin');
+  btn.classList.add('loading'); btn.classList.remove('ok','fail');
+  spin.classList.add('active');
+  btn.disabled = true;
+
+  let ok = 0, fail = 0;
+  try {
+    // Fetch GBP/CHF rate first (needed for EQQQ.L)
+    try {
+      const fx = await yahooPrice('GBPCHF=X');
+      gbpChf = fx.price;
+    } catch(e) { /* use fallback */ }
+
+    for (const [sec, ticker] of Object.entries(TICKER_MAP)) {
+      if (!ticker) continue;
+      try {
+        const { price, currency } = await yahooPrice(ticker);
+        // EQQQ.L is quoted in GBp (pence) — convert to CHF
+        let priceCHF = price;
+        if (currency === 'GBp') priceCHF = (price / 100) * gbpChf;
+        state.prices[sec] = parseFloat(priceCHF.toFixed(4));
+        ok++;
+      } catch(e) { fail++; }
+    }
+  } catch(e) { fail++; }
+
+  await save();
+  render();
+
+  spin.classList.remove('active');
+  btn.disabled = false;
+  if (fail === 0) {
+    btn.classList.add('ok');
+    toast('Prices updated ✓');
+  } else if (ok > 0) {
+    btn.classList.add('ok');
+    toast(`${ok} updated, ${fail} failed`);
+  } else {
+    btn.classList.add('fail');
+    toast('Price fetch failed — enter manually');
+  }
+  setTimeout(() => btn.classList.remove('ok','fail','loading'), 3000);
+
+  // Store timestamp
+  state.lastPriceFetch = new Date().toISOString();
+  await save();
+}
+
+// Auto-fetch on open, but throttle: skip if last fetch was <5 min ago
+async function maybeAutoFetch() {
+  if (!state.lastPriceFetch) { fetchPrices(); return; }
+  const age = (Date.now() - new Date(state.lastPriceFetch)) / 1000 / 60; // minutes
+  if (age > 5) fetchPrices();
+}
+
+load().then ? load().then(maybeAutoFetch) : (load(), setTimeout(maybeAutoFetch, 300));
+</script>
+</body>
+</html>
