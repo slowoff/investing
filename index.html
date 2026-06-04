@@ -513,6 +513,7 @@
 <!-- ── DASHBOARD ── -->
 <div id="tab-dashboard" class="section active">
   <div class="kpi-grid" id="kpiGrid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:16px" id="extraWidgets"></div>
   <div class="progress-card">
     <div class="progress-header">
       <span>PROGRESS TO CHF 480,000</span>
@@ -822,6 +823,7 @@ function render() {
   const divNet  = state.dividends.reduce((a,d) => a + (d.gross - d.tax), 0);
 
   renderKPIs(value, cost, gain, gainPct, divNet);
+  renderExtraWidgets(value, cost);
   renderProgress(value);
   renderTriggers(value);
   renderPie(pos, value);
@@ -883,6 +885,96 @@ function renderTriggers(value) {
       <div class="trigger-away">${done ? '✅ done' : away + ' away'}</div>
     </div>`;
   }).join('');
+}
+
+function renderExtraWidgets(value, cost) {
+  // ── Next Buy ──
+  const ROTATION = { 'MSCI World CHF Hedged': 7, 'EQQQ Nasdaq 100': 5 };
+  const nextBuys = Object.entries(ROTATION).map(([sec, timesPerYear]) => {
+    const interval = 365 / timesPerYear;
+    const buys = state.trades.filter(t => t.sec === sec && t.type === 'Buy');
+    const lastDate = buys.length ? new Date(Math.max(...buys.map(t => new Date(t.date)))) : new Date('2026-01-01');
+    const nextDate = new Date(lastDate.getTime() + interval * 86400000);
+    const days = Math.ceil((nextDate - new Date()) / 86400000);
+    return { sec, days, nextDate, overdue: days < 0 };
+  }).sort((a, b) => a.days - b.days);
+
+  const nb = nextBuys[0];
+  const nbLabel = nb.sec === 'MSCI World CHF Hedged' ? 'MSCI WORLD' : 'EQQQ';
+  const nbColor = nb.overdue ? 'var(--amber)' : 'var(--green)';
+  const nbDaysText = nb.overdue ? `${Math.abs(nb.days)}d overdue` : `in ${nb.days}d`;
+  const nbDateStr = nb.nextDate.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+
+  const nextBuyHTML = `
+    <div style="background:var(--bg);padding:18px 20px">
+      <div style="font-size:9px;color:var(--mid);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">Next Buy</div>
+      <div style="font-size:19px;font-weight:500;color:${nbColor};letter-spacing:-0.3px;margin-bottom:4px">${nbLabel}</div>
+      <div style="font-size:22px;font-weight:600;color:${nbColor};font-variant-numeric:tabular-nums;letter-spacing:-0.5px">CHF 250</div>
+      <div style="font-size:11px;color:var(--mid);margin-top:8px;font-variant-numeric:tabular-nums">${nbDateStr} · ${nbDaysText}</div>
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        ${nextBuys.map(b => {
+          const lbl = b.sec === 'MSCI World CHF Hedged' ? 'MSCI' : 'EQQQ';
+          const col = b.overdue ? 'var(--amber)' : b.days <= 14 ? 'var(--green)' : 'var(--mid)';
+          const dtxt = b.overdue ? `${Math.abs(b.days)}d overdue` : `${b.days}d`;
+          return `<div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px"><span style="color:var(--mid)">${lbl}</span><span style="color:${col};font-variant-numeric:tabular-nums">${dtxt}</span></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // ── Milestone Projections ──
+  const avgMonthly = (() => {
+    if (state.trades.length === 0) return 250;
+    const firstDate = new Date(Math.min(...state.trades.map(t => new Date(t.date))));
+    const months = Math.max(1, (new Date() - firstDate) / (30.44 * 86400000));
+    const totalBought = state.trades.filter(t => t.type === 'Buy')
+      .reduce((a, t) => a + (t.units * t.price + (t.fees||0)) * (t.ccy === 'USD' ? state.usdRate : 1), 0);
+    return totalBought / months;
+  })();
+  const r = 0.07 / 12;
+  const milestones = [80000, 200000, 450000];
+  const projHTML = `
+    <div style="background:var(--bg);padding:18px 20px">
+      <div style="font-size:9px;color:var(--mid);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">Milestone Projections</div>
+      <div style="font-size:9px;color:var(--mid);margin-bottom:10px;letter-spacing:0.04em">@ CHF ${Math.round(avgMonthly)}/mo · 7% p.a.</div>
+      ${milestones.map(target => {
+        if (value >= target) return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)"><span style="font-size:10px;color:var(--mid)">CHF ${(target/1000).toFixed(0)}k</span><span style="font-size:10px;color:var(--green)">✓ reached</span></div>`;
+        let n = 0, val = value;
+        while (val < target && n < 600) { val = val * (1 + r) + avgMonthly; n++; }
+        const d = new Date(); d.setMonth(d.getMonth() + n);
+        const yr = d.getFullYear();
+        const age = 19 + Math.floor(n / 12);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:10px;color:var(--mid)">CHF ${(target/1000).toFixed(0)}k</span>
+          <span style="font-size:11px;color:var(--white);font-variant-numeric:tabular-nums">${yr} <span style="color:var(--mid);font-size:9px">age ${age}</span></span>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // ── YTD Return ──
+  const ytdStart = new Date('2026-01-01');
+  const ytdInvested = state.trades
+    .filter(t => t.type === 'Buy' && new Date(t.date) >= ytdStart)
+    .reduce((a, t) => a + (t.units * t.price + (t.fees||0)) * (t.ccy === 'USD' ? state.usdRate : 1), 0);
+  const ytdReturn = ytdInvested > 0 ? ((value - ytdInvested) / ytdInvested) * 100 : 0;
+  const ytdColor = ytdReturn >= 0 ? 'var(--green)' : 'var(--red)';
+  const ytdHTML = `
+    <div style="background:var(--bg);padding:18px 20px">
+      <div style="font-size:9px;color:var(--mid);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">YTD Return</div>
+      <div style="font-size:28px;font-weight:500;color:${ytdColor};font-variant-numeric:tabular-nums;letter-spacing:-0.5px">${ytdReturn >= 0 ? '+' : ''}${ytdReturn.toFixed(2)}%</div>
+      <div style="font-size:11px;color:var(--mid);margin-top:8px">since 01 Jan 2026</div>
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px">
+          <span style="color:var(--mid)">invested YTD</span>
+          <span style="color:var(--white);font-variant-numeric:tabular-nums">${fmtCHF(ytdInvested)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px">
+          <span style="color:var(--mid)">current value</span>
+          <span style="color:var(--white);font-variant-numeric:tabular-nums">${fmtCHF(value)}</span>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('extraWidgets').innerHTML = nextBuyHTML + ytdHTML;
 }
 
 function renderPie(pos, totalVal) {
