@@ -592,7 +592,6 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">Current Positions</span>
-      <span style="font-size:11px;font-family:var(--mono);color:var(--mid)">USD converted @ <span id="usdRate">0.88</span> CHF</span>
     </div>
     <table>
       <thead>
@@ -608,9 +607,6 @@
       </thead>
       <tbody id="positionsTable"></tbody>
     </table>
-    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">USD/CHF RATE</span>
-      <input type="number" id="usdRateInput" step="0.001" style="width:100px;background:var(--surface2);border:1px solid var(--border2);border-radius:5px;color:var(--amber);font-family:var(--mono);font-size:12px;padding:5px 8px;text-align:right;outline:none" oninput="updateUsdRate(this.value)">
     </div>
   </div>
 </div>
