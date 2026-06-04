@@ -1212,11 +1212,10 @@ let gbpChf = 1.13;
 
 async function yahooPrice(ticker) {
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
-  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+  const url = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(yahooUrl)}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error('HTTP ' + r.status);
-  const wrapper = await r.json();
-  const data = JSON.parse(wrapper.contents);
+  const data = await r.json();
   const meta = data?.chart?.result?.[0]?.meta;
   if (!meta?.regularMarketPrice) throw new Error('no price');
   return { price: meta.regularMarketPrice, currency: meta.currency };
@@ -1231,23 +1230,21 @@ async function fetchPrices(manual = false) {
 
   let ok = 0, fail = 0;
   try {
-    // Fetch GBP/CHF rate first (needed for EQQQ.L)
-    try {
-      const fx = await yahooPrice('GBPCHF=X');
-      gbpChf = fx.price;
-    } catch(e) { /* use fallback */ }
+    // Fetch GBP/CHF + all tickers in parallel
+    const entries = [['__fx__', 'GBPCHF=X'], ...Object.entries(TICKER_MAP).filter(([,t])=>t)];
+    const results = await Promise.allSettled(entries.map(([sec, ticker]) => yahooPrice(ticker).then(r => ({sec, ...r}))));
 
-    for (const [sec, ticker] of Object.entries(TICKER_MAP)) {
-      if (!ticker) continue;
-      try {
-        const { price, currency } = await yahooPrice(ticker);
-        // EQQQ.L is quoted in GBp (pence) — convert to CHF
+    results.forEach((res, i) => {
+      const [sec] = entries[i];
+      if (res.status === 'fulfilled') {
+        const { price, currency } = res.value;
+        if (sec === '__fx__') { gbpChf = price; return; }
         let priceCHF = price;
         if (currency === 'GBp') priceCHF = (price / 100) * gbpChf;
         state.prices[sec] = parseFloat(priceCHF.toFixed(4));
         ok++;
-      } catch(e) { fail++; }
-    }
+      } else { if (sec !== '__fx__') fail++; }
+    });
   } catch(e) { fail++; }
 
   await save();
@@ -1267,7 +1264,6 @@ async function fetchPrices(manual = false) {
   }
   setTimeout(() => btn.classList.remove('ok','fail','loading'), 3000);
 
-  // Store timestamp
   state.lastPriceFetch = new Date().toISOString();
   await save();
 }
