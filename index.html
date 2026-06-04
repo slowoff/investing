@@ -1206,17 +1206,28 @@ const TICKER_MAP = {
   "MSCI World CHF Hedged": "IWDC.SW",
   "EQQQ Nasdaq 100":        "EQQQ.L",
   "Swissqoin (SWQ)":        null,
-  "__usd__":                "USDCHF=X",
 };
-// GBP/CHF is fetched dynamically; fallback value
-let gbpChf = 1.13;
+
+async function getFxRates() {
+  // Frankfurter is a free FX API with proper CORS — no proxy needed
+  try {
+    const r = await fetch('https://api.frankfurter.app/latest?from=USD,GBP&to=CHF');
+    const d = await r.json();
+    if (d?.rates) {
+      if (d.base === 'USD' && d.rates.CHF) state.usdRate = parseFloat(d.rates.CHF.toFixed(4));
+    }
+    // Get GBP/CHF separately
+    const r2 = await fetch('https://api.frankfurter.app/latest?from=GBP&to=CHF');
+    const d2 = await r2.json();
+    if (d2?.rates?.CHF) gbpChf = parseFloat(d2.rates.CHF.toFixed(4));
+  } catch(e) {}
+}
 
 async function yahooPrice(ticker) {
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
   const race = [
     fetch(`https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`).then(r => { if(!r.ok) throw 0; return r.json(); }),
-    fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`).then(r => { if(!r.ok) throw 0; return r.json().then(w => JSON.parse(w.contents)); }),
-    fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(yahooUrl)}`).then(r => { if(!r.ok) throw 0; return r.json(); }),
+    fetch(`https://proxy.cors.sh/${yahooUrl}`, {headers:{'x-cors-api-key':'temp_public'}}).then(r => { if(!r.ok) throw 0; return r.json(); }),
   ];
   const data = await Promise.any(race);
   const meta = data?.chart?.result?.[0]?.meta;
@@ -1233,21 +1244,22 @@ async function fetchPrices(manual = false) {
 
   let ok = 0, fail = 0;
   try {
-    // Fetch GBP/CHF + all tickers in parallel
-    const entries = [['__fx__', 'GBPCHF=X'], ...Object.entries(TICKER_MAP).filter(([,t])=>t)];
+    // FX rates via Frankfurter (no proxy needed)
+    await getFxRates();
+
+    // Stock prices in parallel
+    const entries = Object.entries(TICKER_MAP).filter(([,t])=>t);
     const results = await Promise.allSettled(entries.map(([sec, ticker]) => yahooPrice(ticker).then(r => ({sec, ...r}))));
 
     results.forEach((res, i) => {
       const [sec] = entries[i];
       if (res.status === 'fulfilled') {
         const { price, currency } = res.value;
-        if (sec === '__fx__') { gbpChf = price; return; }
-        if (sec === '__usd__') { state.usdRate = parseFloat(price.toFixed(4)); return; }
         let priceCHF = price;
         if (currency === 'GBp') priceCHF = (price / 100) * gbpChf;
         state.prices[sec] = parseFloat(priceCHF.toFixed(4));
         ok++;
-      } else { if (sec !== '__fx__') fail++; }
+      } else { fail++; }
     });
   } catch(e) { fail++; }
 
