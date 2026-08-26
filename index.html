@@ -639,14 +639,21 @@ async function getFxRates(){
 }
 
 async function yahooPrice(ticker){
-  const yf = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
-  const url = `https://corsproxy.io/?url=${encodeURIComponent(yf)}`;
-  const r = await fetch(url, { headers:{ 'x-cors-api-key':'temp_' } });
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const d = await r.json();
-  const m = d?.chart?.result?.[0]?.meta;
-  if(!m?.regularMarketPrice) throw new Error('no price');
-  return { price:m.regularMarketPrice, currency:m.currency };
+  async function tryFetch(url){
+    const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const m=d?.chart?.result?.[0]?.meta;
+    if(!m?.regularMarketPrice) throw new Error('no price');
+    return {price:m.regularMarketPrice,currency:m.currency};
+  }
+  const yf1=`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+  const yf2=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+  const px =`https://corsproxy.io/?url=${encodeURIComponent(yf1)}`;
+  for(const url of [yf1,yf2,px]){
+    try{return await tryFetch(url);}catch(e){continue;}
+  }
+  throw new Error('all sources failed');
 }
 
 async function fetchPrices(manual=false){
