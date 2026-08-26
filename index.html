@@ -616,83 +616,45 @@ function saveEdit(){
 function deleteTrade(id){if(!confirm('Delete this trade?')) return;state.trades=state.trades.filter(t=>t.id!==id);save();render();toast('Trade deleted');}
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEdit();});
 
-// Price fetching — corsproxy.io (free, works on GitHub Pages)
-// XDPU.DE = S&P 500 Xtrackers on XETRA in EUR → convert EUR→CHF
-// EQQQ.L  = EQQQ Nasdaq 100 on LSE in GBp → convert GBp→CHF
-const TICKER_MAP = {
-  "S&P 500 (Xtrackers)": { ticker:"XDPU.DE", ccy:"EUR" },
-  "EQQQ Nasdaq 100":     { ticker:"EQCH.SW",  ccy:"CHF" },
-};
-let gbpChf=0.865, eurChf=0.96;
-
-async function getFxRates(){
-  try{
-    const [u,g,e]=await Promise.all([
-      fetch('https://api.frankfurter.app/latest?from=USD&to=CHF').then(r=>r.json()),
-      fetch('https://api.frankfurter.app/latest?from=GBP&to=CHF').then(r=>r.json()),
-      fetch('https://api.frankfurter.app/latest?from=EUR&to=CHF').then(r=>r.json()),
-    ]);
-    if(u?.rates?.CHF) state.usdRate=parseFloat(u.rates.CHF.toFixed(4));
-    if(g?.rates?.CHF) gbpChf=parseFloat(g.rates.CHF.toFixed(4));
-    if(e?.rates?.CHF) eurChf=parseFloat(e.rates.CHF.toFixed(4));
-  }catch(e){}
-}
-
-async function yahooPrice(ticker){
-  async function tryFetch(url){
-    const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    const m=d?.chart?.result?.[0]?.meta;
-    if(!m?.regularMarketPrice) throw new Error('no price');
-    return {price:m.regularMarketPrice,currency:m.currency};
-  }
-  const yf1=`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
-  const yf2=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
-  const px =`https://corsproxy.io/?url=${encodeURIComponent(yf1)}`;
-  for(const url of [yf1,yf2,px]){
-    try{return await tryFetch(url);}catch(e){continue;}
-  }
-  throw new Error('all sources failed');
-}
-
+// Price fetching — reads prices.json (updated daily by GitHub Actions)
 async function fetchPrices(manual=false){
-  const btn=document.getElementById('refreshBtn');
-  const spin=document.getElementById('refreshSpin');
-  btn.classList.add('loading');btn.classList.remove('ok','fail');
-  spin.classList.add('active');btn.disabled=true;
-  let ok=0,fail=0;
-  try{
-    await getFxRates();
-    const entries=Object.entries(TICKER_MAP);
-    const results=await Promise.allSettled(
-      entries.map(([sec,{ticker}])=>yahooPrice(ticker).then(r=>({sec,...r})))
-    );
-    results.forEach((res,i)=>{
-      const [sec,{ccy:expectedCcy}]=entries[i];
-      if(res.status==='fulfilled'){
-        const {price,currency}=res.value;
-        let p=price;
-        // Convert to CHF based on currency
-        const cur=currency||expectedCcy;
-        if(cur==='GBp'||cur==='GBX') p=(price/100)*gbpChf;
-        else if(cur==='EUR')          p=price*eurChf;
-        else if(cur==='USD')          p=price*state.usdRate;
-        // CHF stays as-is
-        state.prices[sec]=parseFloat(p.toFixed(4));ok++;
-      }else{fail++;}
-    });
-  }catch(e){fail++;}
-  await save();render();
-  spin.classList.remove('active');btn.disabled=false;
-  if(fail===0){btn.classList.add('ok');toast('Prices updated ✓');}
-  else if(ok>0){btn.classList.add('ok');toast(`${ok} updated, ${fail} failed`);}
-  else{btn.classList.add('fail');toast('Price fetch failed — enter manually');}
-  setTimeout(()=>btn.classList.remove('ok','fail','loading'),3000);
-  state.lastPriceFetch=new Date().toISOString();await save();
+  const btn  = document.getElementById('refreshBtn');
+  const spin = document.getElementById('refreshSpin');
+  btn.classList.add('loading'); btn.classList.remove('ok','fail');
+  spin.classList.add('active'); btn.disabled = true;
+
+  try {
+    const r = await fetch('./prices.json?t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    // Update FX rates if present
+    if (d.eur_chf) eurChf = d.eur_chf;
+    if (d.gbp_chf) gbpChf = d.gbp_chf;
+
+    // Set prices for each security
+    if (d['S&P 500 (Xtrackers)']) state.prices['S&P 500 (Xtrackers)'] = d['S&P 500 (Xtrackers)'];
+    if (d['EQQQ Nasdaq 100'])     state.prices['EQQQ Nasdaq 100']     = d['EQQQ Nasdaq 100'];
+
+    const updated = d.updated ? ' · ' + d.updated.slice(0,10) : '';
+    await save(); render();
+    btn.classList.add('ok');
+    toast('Prices loaded ✓' + updated);
+    console.log('Prices from prices.json:', d);
+  } catch(e) {
+    console.error('fetchPrices failed:', e);
+    btn.classList.add('fail');
+    toast('Could not load prices.json — check GitHub Actions ran');
+  }
+
+  spin.classList.remove('active'); btn.disabled = false;
+  setTimeout(() => btn.classList.remove('ok','fail','loading'), 4000);
+  state.lastPriceFetch = new Date().toISOString(); await save();
 }
 
-load().then(()=>fetchPrices());
+let gbpChf = 0.865, eurChf = 0.96;
+
+load().then(() => fetchPrices());
 </script>
 </body>
 </html>
