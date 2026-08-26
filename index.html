@@ -293,15 +293,18 @@ const CCYS   = {"S&P 500 (Xtrackers)":"CHF","EQQQ Nasdaq 100":"CHF"};
 
 let state = { trades:[], dividends:[], prices:{}, usdRate:0.89 };
 
-async function save() {
-  try { await window.storage.set('portfolio-state', JSON.stringify(state)); } catch(e) {}
+function save() {
+  try { localStorage.setItem('portfolio-state', JSON.stringify(state)); } catch(e) {}
 }
 
 const DATA_VERSION = 8;
 
-async function load() {
-  try { const r = await window.storage.get('portfolio-state'); if(r) state = JSON.parse(r.value); } catch(e) {}
-  if (!state.version || state.version < DATA_VERSION) { seedData(); state.version = DATA_VERSION; await save(); }
+function load() {
+  try {
+    const raw = localStorage.getItem('portfolio-state');
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  if (!state.version || state.version < DATA_VERSION) { seedData(); state.version = DATA_VERSION; save(); }
   render();
 }
 
@@ -637,7 +640,7 @@ async function fetchPrices(manual=false){
     if (d['EQQQ Nasdaq 100'])     state.prices['EQQQ Nasdaq 100']     = d['EQQQ Nasdaq 100'];
 
     const updated = d.updated ? ' · ' + d.updated.slice(0,10) : '';
-    await save(); render();
+    save(); render();
     btn.classList.add('ok');
     toast('Prices loaded ✓' + updated);
     console.log('Prices from prices.json:', d);
@@ -649,12 +652,12 @@ async function fetchPrices(manual=false){
 
   spin.classList.remove('active'); btn.disabled = false;
   setTimeout(() => btn.classList.remove('ok','fail','loading'), 4000);
-  state.lastPriceFetch = new Date().toISOString(); await save();
+  state.lastPriceFetch = new Date().toISOString(); save();
 }
 
 let gbpChf = 0.865, eurChf = 0.96;
 
-load().then(() => fetchPrices());
+load(); fetchPrices();
 </script>
 </body>
 </html>
