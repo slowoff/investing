@@ -179,6 +179,14 @@
       <tbody id="positionsTable"></tbody>
     </table>
   </div>
+  <div style="margin-top:14px;background:var(--bg);border:1px solid var(--border2);padding:16px 20px;display:flex;align-items:center;gap:16px">
+    <span style="font-size:10px;color:var(--mid);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">Manual Total Override</span>
+    <input type="number" id="manualTotalInput" step="0.01" placeholder="Paste total from Yuh app (e.g. 2967.70)"
+      style="flex:1;background:var(--surface);border:1px solid rgba(255,179,0,.3);color:var(--amber);font-family:var(--mono);font-size:13px;padding:8px 12px;outline:none"
+      oninput="setManualTotal(this.value)">
+    <button onclick="clearManualTotal()" style="background:none;border:1px solid var(--border2);color:var(--mid);font-family:var(--mono);font-size:10px;padding:6px 12px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase">Clear</button>
+    <span style="font-size:10px;color:var(--mid);white-space:nowrap" id="manualTotalNote"></span>
+  </div>
 </div>
 
 <!-- ADD TRADE -->
@@ -315,8 +323,9 @@ function seedData() {
     {id:3, date:"2026-08-24", sec:"EQQQ Nasdaq 100",     type:"Buy", units:0.6703,   price:454.35, ccy:"CHF", fees:1.98},
   ];
   state.dividends = [];
-  state.prices    = {};
-  state.usdRate   = 0.89;
+  state.prices     = {};
+  state.usdRate    = 0.89;
+  state.manualTotal = null;
 }
 
 function calcPositions() {
@@ -336,6 +345,7 @@ function totalInvested(pos) {
 }
 
 function portfolioValue(pos) {
+  if (state.manualTotal !== null && state.manualTotal > 0) return state.manualTotal;
   let total = 0;
   SECS.forEach(s => {
     const p = pos[s]; if (!p || p.units <= 0) return;
@@ -370,6 +380,12 @@ function render() {
   document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleDateString('en-GB');
   document.getElementById('tradeDate').valueAsDate = new Date();
   document.getElementById('divDate').valueAsDate   = new Date();
+  const mti = document.getElementById('manualTotalInput');
+  const mtn = document.getElementById('manualTotalNote');
+  if (mti) {
+    if (state.manualTotal && mti.value === '') mti.value = state.manualTotal;
+    if (mtn) mtn.textContent = state.manualTotal ? '✓ using manual total' : 'using auto prices';
+  }
 }
 
 function renderKPIs(val, cost, gain, gp, div) {
@@ -657,6 +673,16 @@ async function fetchPrices(manual=false){
 
 let gbpChf = 0.865, eurChf = 0.96;
 
+function setManualTotal(val) {
+  const n = parseFloat(val);
+  state.manualTotal = (!val || isNaN(n)) ? null : n;
+  save(); render();
+}
+function clearManualTotal() {
+  state.manualTotal = null;
+  document.getElementById('manualTotalInput').value = '';
+  save(); render();
+}
 load(); fetchPrices();
 </script>
 </body>
